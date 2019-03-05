@@ -94,7 +94,7 @@ app.use('/ext/getblocks/:start/:end', async function (req, res) {
   const searchFlds = flds[0] === 'summary'
     ? { fulltx: 0, _id: 0 }
     : flds ? flds.reduce((acc, fld) => ({ ...acc, [fld]: 1 }), { _id: 0, height: 1 }) : []
-  let blocks = await db.getBlocks(heights, searchFlds)
+  let blocks = await lib.getBlocks(heights, searchFlds)
   if (!blocks) {
     blocks = await Promise.all(heights.map(h => lib.getRawRpc('getblockhash', [ h ]).then(hash => lib.getRawRpc('getblock', [ hash ]))))
   } else {

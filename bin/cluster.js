@@ -30,17 +30,17 @@ if (cluster.isMaster) {
       db.connect(settings.dbsettings).then(() =>
         db.setupSchema()
       ).then(() => {
-        // set database update intervals
-        spawnCmd('node', [ 'scripts/sync.js', 'index', settings.index.index_mode || 'update' ])
-        updateIntervals.push(setInterval(function () {
-          spawnCmd('node', [ 'scripts/sync.js', 'index', 'update' ])
-        }, settings.sync_timeout))
-        updateIntervals.push(setInterval(function () {
-          spawnCmd('node', [ 'scripts/sync.js', 'market' ])
-        }, settings.market_timeout))
-        updateIntervals.push(setInterval(function () {
-          spawnCmd('node', [ 'scripts/peers.js' ])
-        }, settings.peer_timeout))
+      //   // set database update intervals
+      //   spawnCmd('node', [ 'scripts/sync.js', 'index', settings.index.index_mode || 'update' ])
+      //   updateIntervals.push(setInterval(function () {
+      //     spawnCmd('node', [ 'scripts/sync.js', 'index', 'update' ])
+      //   }, settings.sync_timeout))
+      //   updateIntervals.push(setInterval(function () {
+      //     spawnCmd('node', [ 'scripts/sync.js', 'market' ])
+      //   }, settings.market_timeout))
+      //   updateIntervals.push(setInterval(function () {
+      //     spawnCmd('node', [ 'scripts/peers.js' ])
+      //   }, settings.peer_timeout))
 
         // spawn a worker for each cpu core
         require('os').cpus().forEach(_ => {
