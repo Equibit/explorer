@@ -1,15 +1,16 @@
-const mongoose = require('mongoose'),
-  db = require('../lib/database'),
-  Block = require('../models/block'),
-  Address = require('../models/address'),
-  Richlist = require('../models/richlist'),
-  settings = require('../lib/settings'),
-  { promisify } = require('../lib/util'),
-  fs = require('fs'),
-  debug = require('debug')('explorer:sync')
+const mongoose = require('mongoose')
+const db = require('../lib/database')
+const Block = require('../models/block')
+const Address = require('../models/address')
+const Richlist = require('../models/richlist')
+const Stats = require('../models/stats')
+const settings = require('../lib/settings')
+const { promisify } = require('../lib/util')
+const debug = require('debug')('explorer:sync')
+const fs = require('fs')
 
 const validDbs = [ 'index', 'market' ]
-const validModes = [ 'update', 'check', 'reindex' ]
+const validModes = [ 'update', 'reindex' ]
 
 // displays usage and exits
 function usage() {
@@ -21,14 +22,11 @@ function usage() {
   console.log('');
   console.log('mode: (required for index database only)');
   console.log('update       Updates index from last sync to current block');
-  console.log('check        checks index for (and adds) any missing transactions/addresses');
   console.log('reindex      Clears index then resyncs from genesis to current block');
   console.log('');
   console.log('notes:'); 
   console.log('* \'current block\' is the latest created block when script is executed.');
   console.log('* The market database only supports (& defaults to) reindex mode.');
-  console.log('* If check mode finds missing data(ignoring new data since last sync),'); 
-  console.log('  index_timeout in settings.json is set too low.')
   console.log('');
   process.exit(0);
 }
@@ -131,31 +129,22 @@ async function main() {
   })
 
   if (database === 'index') {
-    if (!(await promisify(db.check_stats, settings.coin))) {
-      debug(`Run 'npm start' to create database structure before running this script.`)
-      exit(database)
-    }
-
-    await db.updateStats(settings.coin)
-    const stats = await promisify(db.get_stats, settings.coin)
+    // await db.syncStats(settings.coin)
+    // const stats = await promisify(db.get_stats, settings.coin)
+    await promisify(Stats.remove.bind(Stats), {})
 
     if (mode === 'reindex') {
       await promisify(Block.remove.bind(Block), {})
       await promisify(Address.remove.bind(Address), {})
       await promisify(Richlist.update.bind(Richlist), { coin: settings.coin }, { received: [], balance: [] })
       
-      debug('[reindex]: index cleared')
+      debug('[reindex]: all indices cleared')
     }
 
-    await db.updateDb(0, stats.blocks, settings.update_timeout)
+    // await db.updateDb(0, stats.blocks, settings.update_timeout)
 
-    if (mode === 'check') {
-      debug(`[check]: complete`)
-      return
-    }
-
-    await promisify(db.update_richlist, 'received')
-    await promisify(db.update_richlist, 'balance')
+    // await promisify(db.update_richlist, 'received')
+    // await promisify(db.update_richlist, 'balance')
 
     debug(`[${mode}]: index complete (${stats.blocks})`)
     exit(database)

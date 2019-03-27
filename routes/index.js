@@ -1,12 +1,14 @@
-var express = require('express')
-  , router = express.Router()
-  , settings = require('../lib/settings')
-  , locale = require('../lib/locale')
-  , db = require('../lib/database')
-  , lib = require('../lib/explorer')
-  , qr = require('qr-image');
+const express = require('express'),
+  router = express.Router(),
+  settings = require('../lib/settings'),
+  locale = require('../lib/locale'),
+  db = require('../lib/database'),
+  lib = require('../lib/explorer'),
+  qr = require('qr-image'),
+  { allSeq } = require('../lib/util')
 
 function route_get_block(res, blockhash) {
+  res.
   lib.getBlock(blockhash, function (block) {
     const safeRender = list => list && list.length > 0 && list.filter(l => l).length ? list : []
     const renderBase = {
@@ -25,13 +27,11 @@ function route_get_block(res, blockhash) {
           } else {
             // Promise.all can't be used because the requests must be sequential
             // to avoid bitcoin-core's work queue depth to be exceeded.
-            block.tx.map(tx => async (fetched) => [
+            allSeq(block.tx.map(tx => async (fetched) => [
               ...fetched,
               await lib.getRawRpc('getrawtransaction', [ tx, 1 ])
                 .then(tx => db.parseTx(block, tx))
-            ]).reduce((p, fn) =>
-              p.then(fn), Promise.resolve([])
-            ).then(rawtxs => {
+            ])).then(rawtxs => {
               res.render('block', {
                 ...renderBase,
                 txs: safeRender(rawtxs)

@@ -11,7 +11,7 @@ const express = require('express'),
   lib = require('./lib/explorer'),
   db = require('./lib/database'),
   locale = require('./lib/locale'),
-  { requestp } = require('./lib/util'),
+  { requestp, allSeq } = require('./lib/util'),
   info = require('./info')
 
 const app = express()
@@ -80,34 +80,38 @@ app.use('/ext/getblocks/:start/:end', async function (req, res) {
   const start = parseInt(req.param('start'))
   const end = parseInt(req.param('end'))
   const reverse = req.query.reverse && req.query.reverse.toLowerCase() === 'true'
-  const flds = typeof req.query.flds === 'string' ? req.query.flds.split(',') : req.query.flds || []
+  const flds = typeof req.query.flds === 'string'
+    ? req.query.flds.split(',') : req.query.flds || []
+  const blockcount = await requestp(`${endpoint}/api/getblockcount`)
 
   if (start > end) {
-    res.send({ error: `End blockheight must be greater than or equal to the start blockheight.` })
-    return
+    return res.send({
+      error: `End blockheight must be greater than or equal to the start blockheight.`
+    })
   }
-
-  const blockcount = await requestp(`${endpoint}/api/getblockcount`)
+  
   let heights = Array(end - start + 1).fill(undefined).map((_, i) => start + i)
   if (reverse) heights = heights.map(h => blockcount - h + 1)
+  let blocks = await allSeq(heights.map(h => (async () => {
+    const hash = await requestp(`${endpoint}/api/getblockhash?hash=${h}`)
+    let block = await requestp(`${endpoint}/api/getblock?hash=${hash}`)
+    if (flds.includes('fulltx')) block = {
+      ...block,
+      fulltx: await allSeq(block.tx.map(t =>
+        requestp(`${endpoint}/api/getrawtransaction?hash=${t}&decode=1`)
+      ))
+    }
+    return block
+  })()))
 
-  const searchFlds = flds[0] === 'summary'
-    ? { fulltx: 0, _id: 0 }
-    : flds ? flds.reduce((acc, fld) => ({ ...acc, [fld]: 1 }), { _id: 0, height: 1 }) : []
-  let blocks = await Promise.all(heights.map(h =>
-    requestp(`${endpoint}/api/getblockhash?hash=${h}`).then(hash =>
-      requestp(`${endpoint}/api/getblock?hash=${hash}`)
-    )
-  ))
-  if (!blocks) {
-    blocks = await Promise.all(heights.map(h => lib.getRawRpc('getblockhash', [ h ]).then(hash => lib.getRawRpc('getblock', [ hash ]))))
-  } else {
-    blocks = blocks.sort((a, b) => (reverse ? -1 : 1) * (a.height <= b.height ? -1 : 1))
-  }
-  blocks.forEach(block => {
-    if (!flds.includes('height') && flds[0] !== 'summary') delete block['height']
-  })
-  res.send({ data: { blockcount, blocks } })
+  blocks.sort((a, b) => (reverse ? -1 : 1) * (a.height <= b.height ? -1 : 1))
+  res.send({ data: {
+    blockcount,
+    blocks: blocks.map(block =>
+    Object.entries(block).reduce((acc, [k, v]) =>
+      flds[0] === 'summary' || flds.includes(k) ? ({ ...acc, [k]: v }) : acc,
+    {}))
+  } })
 })
 
 app.use('/ext/connections', function(req,res){
